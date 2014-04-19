@@ -221,7 +221,7 @@ FSStreamConfiguration makeFreeStreamerDefaultConfiguration();
 /**
  * Delegate.
  */
-@property (nonatomic,unsafe_unretained) IBOutlet id<FSPCMAudioStreamDelegate> delegate;
+@property (nonatomic,weak) IBOutlet id<FSPCMAudioStreamDelegate> delegate;
 
 @end
 
