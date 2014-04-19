@@ -78,7 +78,7 @@ public:
     void audioQueueOverflow();
     void audioQueueUnderflow();
     void audioQueueInitializationFailed();
-    
+    void audioQueueFinishedWithBuffer(AudioQueueBufferRef buffer);
     /* HTTP_Stream_Delegate */
     void streamIsReadyRead();
     void streamHasBytesAvailable(UInt8 *data, UInt32 numBytes);
@@ -155,8 +155,8 @@ public:
     virtual void audioStreamStateChanged(Audio_Stream::State state) = 0;
     virtual void audioStreamErrorOccurred(int errorCode) = 0;
     virtual void audioStreamMetaDataAvailable(std::map<CFStringRef,CFStringRef> metaData) = 0;
-    virtual void samplesAvailable(AudioBufferList samples, AudioStreamPacketDescription description) = 0;
-};    
+    virtual void samplesAvailable(AudioQueueBufferRef buffer) = 0;
+};
 
 } // namespace astreamer
 

@@ -98,7 +98,7 @@ public:
     void audioStreamErrorOccurred(int errorCode);
     void audioStreamStateChanged(astreamer::Audio_Stream::State state);
     void audioStreamMetaDataAvailable(std::map<CFStringRef,CFStringRef> metaData);
-    void samplesAvailable(AudioBufferList samples, AudioStreamPacketDescription description);
+    void samplesAvailable(AudioQueueBufferRef buffer);
 };
 
 /*
@@ -861,12 +861,11 @@ void AudioStreamStateObserver::audioStreamMetaDataAvailable(std::map<CFStringRef
     [[NSNotificationCenter defaultCenter] postNotification:notification];
 }
 
-void AudioStreamStateObserver::samplesAvailable(AudioBufferList samples, AudioStreamPacketDescription description)
+void AudioStreamStateObserver::samplesAvailable(AudioQueueBufferRef buffer)
 {
     if ([priv.delegate respondsToSelector:@selector(audioStream:samplesAvailable:count:)]) {
-        int16_t *buffer = (int16_t *)samples.mBuffers[0].mData;
-        NSUInteger count = description.mDataByteSize / sizeof(int16_t);
-        
-        [priv.delegate audioStream:priv.stream samplesAvailable:buffer count:count];
+        int16_t *data = (int16_t *)buffer->mAudioData;//  mBuffers[0].mData;
+        NSUInteger count = buffer->mAudioDataByteSize / sizeof(int16_t);
+        [priv.delegate audioStream:priv.stream samplesAvailable:data count:count];
     }
 }

@@ -488,7 +488,10 @@ void Audio_Queue::audioQueueOutputCallback(void *inClientData, AudioQueueRef inA
 {
     Audio_Queue *audioQueue = static_cast<Audio_Queue*>(inClientData);    
     unsigned int bufIndex = audioQueue->findQueueBuffer(inBuffer);
-    
+    if (audioQueue->m_delegate) {
+        audioQueue->m_delegate->audioQueueFinishedWithBuffer(inBuffer);
+    }
+
     assert(audioQueue->m_bufferInUse[bufIndex]);
     
     audioQueue->m_bufferInUse[bufIndex] = false;

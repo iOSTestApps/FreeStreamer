@@ -472,6 +472,13 @@ void Audio_Stream::audioQueueInitializationFailed()
         }
     }
 }
+
+void Audio_Stream::audioQueueFinishedWithBuffer(AudioQueueBufferRef buffer)
+{
+    if (m_delegate && buffer != NULL) {
+        m_delegate->samplesAvailable(buffer);
+    }
+}
     
 void Audio_Stream::streamIsReadyRead()
 {
@@ -875,9 +882,9 @@ void Audio_Stream::streamDataCallback(void *inClientData, UInt32 inNumberBytes, 
                                                    outputBufferList.mBuffers[0].mData,
                                                    &description);
             
-            if (THIS->m_delegate) {
-                THIS->m_delegate->samplesAvailable(outputBufferList, description);
-            }
+//            if (THIS->m_delegate) {
+//                THIS->m_delegate->samplesAvailable(outputBufferList, description);
+//            }
             
             for(std::list<queued_packet_t*>::iterator iter = THIS->m_processedPackets.begin();
                 iter != THIS->m_processedPackets.end(); iter++) {
