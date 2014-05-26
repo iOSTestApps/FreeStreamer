@@ -39,6 +39,7 @@ public:
     Audio_Stream_Delegate *m_delegate;
     
     enum State {
+        PAUSED,
         STOPPED,
         BUFFERING,
         PLAYING,
