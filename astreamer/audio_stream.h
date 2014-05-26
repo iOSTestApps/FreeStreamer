@@ -102,10 +102,13 @@ private:
     HTTP_Stream *m_httpStream;
     Audio_Queue *m_audioQueue;
     
+    CFRunLoopTimerRef m_watchdogTimer;
+    
     AudioFileStreamID m_audioFileStream;	// the audio file stream parser
     AudioConverterRef m_audioConverter;
     AudioStreamBasicDescription m_srcFormat;
     AudioStreamBasicDescription m_dstFormat;
+    OSStatus m_initializationError;
     
     UInt32 m_outputBufferSize;
     UInt8 *m_outputBuffer;
@@ -143,6 +146,8 @@ private:
     void setState(State state);
     void setCookiesForStream(AudioFileStreamID inAudioFileStream);
     unsigned bitrate();
+    
+    static void watchdogTimerCallback(CFRunLoopTimerRef timer, void *info);
     
     static OSStatus encoderDataCallback(AudioConverterRef inAudioConverter, UInt32 *ioNumberDataPackets, AudioBufferList *ioData, AudioStreamPacketDescription **outDataPacketDescription, void *inUserData);
     static void propertyValueCallback(void *inClientData, AudioFileStreamID inAudioFileStream, AudioFileStreamPropertyID inPropertyID, UInt32 *ioFlags);

@@ -34,6 +34,7 @@ FSStreamConfiguration makeFreeStreamerDefaultConfiguration()
     defaultConfiguration.outputNumChannels = 2;
     defaultConfiguration.bounceInterval    = 10;
     defaultConfiguration.maxBounceCount    = 4;   // Max number of bufferings in bounceInterval seconds
+    defaultConfiguration.startupWatchdogPeriod = 30; // If the stream doesn't start to play in this seconds, the watchdog will fail it
     
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 60000)
     AVAudioSession *session = [AVAudioSession sharedInstance];
@@ -112,8 +113,6 @@ public:
     NSURL *_url;
     BOOL _strictContentTypeChecking;
 	AudioStreamStateObserver *_observer;
-    BOOL _wasInterrupted;
-    BOOL _wasDisconnected;
     NSString *_defaultContentType;
     Reachability *_reachability;
 #if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
@@ -128,6 +127,8 @@ public:
 @property (nonatomic,assign) NSString *suggestedFileExtension;
 @property (nonatomic,assign) NSURL *outputFile;
 @property (nonatomic,assign) BOOL wasInterrupted;
+@property (nonatomic,assign) BOOL wasDisconnected;
+@property (nonatomic,assign) BOOL wasContinuousStream;
 @property (readonly) FSStreamConfiguration configuration;
 @property (readonly) NSString *formatDescription;
 @property (copy) void (^onCompletion)();
@@ -156,8 +157,6 @@ public:
 {
     if (self = [super init]) {
         _url = nil;
-        _wasInterrupted = NO;
-        _wasDisconnected = NO;
         
         _observer = new AudioStreamStateObserver();
         _observer->priv = self;
@@ -345,6 +344,7 @@ public:
     config.outputNumChannels        = c->outputNumChannels;
     config.bounceInterval           = c->bounceInterval;
     config.maxBounceCount           = c->maxBounceCount;
+    config.startupWatchdogPeriod    = c->startupWatchdogPeriod;
 
     return config;
 }
@@ -361,15 +361,15 @@ public:
     BOOL internetConnectionAvailable = (netStatus == ReachableViaWiFi || netStatus == ReachableViaWWAN);
     
     if ([self isPlaying] && !internetConnectionAvailable) {
-        _wasDisconnected = YES;
+        self.wasDisconnected = YES;
         
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
         NSLog(@"FSAudioStream: Error: Internet connection disconnected while playing a stream.");
 #endif
     }
     
-    if (_wasDisconnected && internetConnectionAvailable) {
-        _wasDisconnected = NO;
+    if (self.wasDisconnected && internetConnectionAvailable) {
+        self.wasDisconnected = NO;
         
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
         NSLog(@"FSAudioStream: Internet connection available again. Restarting stream playback.");
@@ -395,12 +395,20 @@ public:
     if ([interruptionType intValue] == AVAudioSessionInterruptionTypeBegan) {
         if ([self isPlaying]) {
             self.wasInterrupted = YES;
+            // Continuous streams do not have a duration.
+            self.wasContinuousStream = (0 == [self durationInSeconds]);
             
+            if (self.wasContinuousStream) {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Interruption began. Pausing the stream.");
+                NSLog(@"FSAudioStream: Interruption began. Continuous stream. Stopping the stream.");
 #endif
-            
-            [self pause];
+                [self stop];
+            } else {
+#if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
+                NSLog(@"FSAudioStream: Interruption began. Non-continuous stream. Pausing the stream.");
+#endif
+                [self pause];
+            }
         }
     } else if ([interruptionType intValue] == AVAudioSessionInterruptionTypeEnded) {
         if (self.wasInterrupted) {
@@ -408,14 +416,23 @@ public:
             
             [[AVAudioSession sharedInstance] setActive:YES error:nil];
             
+            if (self.wasContinuousStream) {
 #if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
-            NSLog(@"FSAudioStream: Interruption ended. Unpausing the stream.");
+                NSLog(@"FSAudioStream: Interruption ended. Continuous stream. Starting the playback.");
 #endif
-            
-            /*
-             * Resume playing.
-             */
-            [self pause];
+                /*
+                 * Resume playing.
+                 */
+                [self play];
+            } else {
+#if defined(DEBUG) || (TARGET_IPHONE_SIMULATOR)
+                NSLog(@"FSAudioStream: Interruption ended. Continuous stream. Unpausing the stream.");
+#endif
+                /*
+                 * Resume playing.
+                 */
+                [self pause];
+            }
         }
     }
 #endif
@@ -474,7 +491,7 @@ public:
 
 -(NSString *)description
 {
-    return [NSString stringWithFormat:@"URL: %@\nbufferCount: %i\nbufferSize: %i\nmaxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\noutputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\nmaxBounceCount: %i\nformat: %@",
+    return [NSString stringWithFormat:@"URL: %@\nbufferCount: %i\nbufferSize: %i\nmaxPacketDescs: %i\ndecodeQueueSize: %i\nhttpConnectionBufferSize: %i\noutputSampleRate: %f\noutputNumChannels: %ld\nbounceInterval: %i\nmaxBounceCount: %i\nstartupWatchdogPeriod: %i\nformat: %@",
             self.url,
             self.configuration.bufferCount,
             self.configuration.bufferSize,
@@ -485,6 +502,7 @@ public:
             self.configuration.outputNumChannels,
             self.configuration.bounceInterval,
             self.configuration.maxBounceCount,
+            self.configuration.startupWatchdogPeriod,
             self.formatDescription];
 }
 
@@ -530,6 +548,7 @@ public:
         c->outputNumChannels        = configuration.outputNumChannels;
         c->maxBounceCount           = configuration.maxBounceCount;
         c->bounceInterval           = configuration.bounceInterval;
+        c->startupWatchdogPeriod    = configuration.startupWatchdogPeriod;
         
         _private = [[FSAudioStreamPrivate alloc] init];
         _private.stream = self;

@@ -260,8 +260,8 @@ void HTTP_Stream::id3metaDataAvailable(std::map<CFStringRef,CFStringRef> metaDat
 CFReadStreamRef HTTP_Stream::createReadStream(CFURLRef url)
 {
     CFReadStreamRef readStream = 0;
-    CFHTTPMessageRef request;
-    CFDictionaryRef proxySettings;
+    CFHTTPMessageRef request = 0;
+    CFDictionaryRef proxySettings = 0;
     
     if (!(request = CFHTTPMessageCreateRequest(kCFAllocatorDefault, httpRequestMethod, url, kCFHTTPVersion1_1))) {
         goto out;
@@ -285,13 +285,11 @@ CFReadStreamRef HTTP_Stream::createReadStream(CFURLRef url)
         goto out;
     }
     
-    CFReadStreamSetProperty(readStream,
-                            kCFStreamPropertyHTTPShouldAutoredirect,
-                            kCFBooleanTrue);
-    
     proxySettings = CFNetworkCopySystemProxySettings();
-    CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPProxy, proxySettings);
-    CFRelease(proxySettings);
+    if (proxySettings) {
+        CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPProxy, proxySettings);
+        CFRelease(proxySettings);
+    }
     
 out:
     if (request) {
@@ -658,6 +656,23 @@ void HTTP_Stream::readCallBack(CFReadStreamRef stream, CFStreamEventType eventTy
                 
                 if (CFReadStreamGetStatus(stream) == kCFStreamStatusError ||
                     bytesRead < 0) {
+                    
+#if defined (HS_DEBUG)
+                    CFErrorRef streamError = CFReadStreamCopyError(stream);
+                    
+                    if (streamError) {
+                        CFStringRef errorDesc = CFErrorCopyDescription(streamError);
+                        
+                        if (errorDesc) {
+                            HS_TRACE_CFSTRING(errorDesc);
+                            
+                            CFRelease(errorDesc);
+                        }
+                        
+                        CFRelease(streamError);
+                    }
+#endif /* HS_DEBUG */
+                    
                     if (THIS->m_delegate) {
                         THIS->m_delegate->streamErrorOccurred();
                     }
