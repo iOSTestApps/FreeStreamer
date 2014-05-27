@@ -832,13 +832,6 @@ void AudioStreamStateObserver::audioStreamStateChanged(astreamer::Audio_Stream::
                 priv.onFailure();
             }
             break;
-        case astreamer::Audio_Stream::PAUSED:
-            priv.lastError = kFsAudioStreamErrorNone;
-            fsAudioState = @(kFsAudioStreamPaused);
-#if (__IPHONE_OS_VERSION_MIN_REQUIRED >= 40000)
-            [[AVAudioSession sharedInstance] setActive:NO error:nil];
-#endif
-            break;
         default:
             /* unknown state */
             return;
