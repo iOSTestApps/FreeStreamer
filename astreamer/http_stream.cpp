@@ -284,7 +284,9 @@ CFReadStreamRef HTTP_Stream::createReadStream(CFURLRef url)
     if (!(readStream = CFReadStreamCreateForStreamedHTTPRequest(kCFAllocatorDefault, request, 0))) {
         goto out;
     }
-    
+
+    CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPShouldAutoredirect, kCFBooleanTrue);
+
     proxySettings = CFNetworkCopySystemProxySettings();
     if (proxySettings) {
         CFReadStreamSetProperty(readStream, kCFStreamPropertyHTTPProxy, proxySettings);
