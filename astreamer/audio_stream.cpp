@@ -946,9 +946,11 @@ void Audio_Stream::streamDataCallback(void *inClientData, UInt32 inNumberBytes, 
                 CFRunLoopTimerInvalidate(THIS->m_watchdogTimer);
                 CFRelease(THIS->m_watchdogTimer), THIS->m_watchdogTimer = 0;
             }
-            
-            THIS->setState(PLAYING);
-            
+
+            if (THIS->m_state != PAUSED) {
+                THIS->setState(PLAYING);
+            }
+
             THIS->audioQueue()->handleAudioPackets(outputBufferList.mBuffers[0].mDataByteSize,
                                                    outputBufferList.mNumberBuffers,
                                                    outputBufferList.mBuffers[0].mData,
