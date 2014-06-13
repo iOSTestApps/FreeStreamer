@@ -10,6 +10,7 @@
 
 #include "audio_stream.h"
 #include "stream_configuration.h"
+#include "http_stream.h"
 
 #import <AVFoundation/AVFoundation.h>
 
@@ -137,11 +138,14 @@ public:
 @property (nonatomic,unsafe_unretained) id<FSPCMAudioStreamDelegate> delegate;
 @property (nonatomic,unsafe_unretained) FSAudioStream *stream;
 
+- (AudioStreamStateObserver *)streamStateObserver;
+
 - (void)reachabilityChanged:(NSNotification *)note;
 - (void)interruptionOccurred:(NSNotification *)notification;
 
 - (void)play;
 - (void)playFromURL:(NSURL*)url;
+- (void)playFromOffset:(FSSeekByteOffset)offset;
 - (void)stop;
 - (BOOL)isPlaying;
 - (void)pause;
@@ -149,6 +153,7 @@ public:
 - (void)setVolume:(float)volume;
 - (unsigned)timePlayedInSeconds;
 - (unsigned)durationInSeconds;
+- (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime;
 @end
 
 @implementation FSAudioStreamPrivate
@@ -160,8 +165,10 @@ public:
         
         _observer = new AudioStreamStateObserver();
         _observer->priv = self;
+       
         _audioStream = new astreamer::Audio_Stream();
         _observer->source = _audioStream;
+
         _audioStream->m_delegate = _observer;
         
         _reachability = [Reachability reachabilityForInternetConnection];
@@ -191,14 +198,19 @@ public:
 
 - (void)dealloc
 {
-    [_reachability stopNotifier];
-    
     [[NSNotificationCenter defaultCenter] removeObserver:self];
     
-    _audioStream->close();
+    [self stop];
+    
+    _delegate = nil;
     
     delete _audioStream, _audioStream = nil;
     delete _observer, _observer = nil;
+}
+
+- (AudioStreamStateObserver *)streamStateObserver
+{
+    return _observer;
 }
 
 - (void)setUrl:(NSURL *)url
@@ -249,8 +261,22 @@ public:
 
 - (void)playFromURL:(NSURL*)url
 {
-    [self setUrl:url];
-    [self play];
+   [self setUrl:url];
+   [self play];
+}
+
+- (void)playFromOffset:(FSSeekByteOffset)offset
+{
+    astreamer::HTTP_Stream_Position position;
+    position.start = offset.start;
+    position.end   = offset.end;
+    
+    _audioStream->open(&position);
+    
+    _audioStream->setSeekPosition(offset.position);
+    _audioStream->setContentLength(offset.end);
+    
+    [_reachability startNotifier];
 }
 
 - (void)setDefaultContentType:(NSString *)defaultContentType
@@ -431,7 +457,7 @@ public:
                 /*
                  * Resume playing.
                  */
-                [self pause];
+               [self pause];
             }
         }
     }
@@ -487,6 +513,11 @@ public:
 - (unsigned)durationInSeconds
 {
     return _audioStream->durationInSeconds();
+}
+
+- (astreamer::HTTP_Stream_Position)streamPositionForTime:(unsigned)newSeekTime
+{
+    return _audioStream->streamPositionForTime(newSeekTime);
 }
 
 -(NSString *)description
@@ -556,6 +587,19 @@ public:
     return self;
 }
 
+- (void)dealloc
+{
+    AudioStreamStateObserver *observer = [_private streamStateObserver];
+    
+    // Break the cyclic loop so that dealloc() may be called
+    observer->priv = nil;
+    
+    _private.stream = nil;
+    _private.delegate = nil;
+    
+    _private = nil;
+}
+
 - (void)setUrl:(NSURL *)url
 {
     [_private setUrl:url];
@@ -616,6 +660,11 @@ public:
     [_private playFromURL:url];
 }
 
+- (void)playFromOffset:(FSSeekByteOffset)offset
+{
+    [_private playFromOffset:offset];
+}
+
 - (void)stop
 {
     [_private stop];
@@ -667,6 +716,27 @@ public:
     
     FSStreamPosition pos = {.minute = m, .second = s};
     return pos;
+}
+
+- (FSSeekByteOffset)currentSeekByteOffset
+{
+    FSSeekByteOffset offset;
+    offset.start    = 0;
+    offset.end      = 0;
+    offset.position = 0;
+    
+    if (self.continuous) {
+        return offset;
+    }
+    
+    offset.position = [_private timePlayedInSeconds];
+    
+    astreamer::HTTP_Stream_Position httpStreamPos = [_private streamPositionForTime:offset.position];
+    
+    offset.start = httpStreamPos.start;
+    offset.end   = httpStreamPos.end;
+    
+    return offset;
 }
 
 - (BOOL)continuous

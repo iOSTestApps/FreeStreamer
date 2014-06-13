@@ -51,6 +51,7 @@ public:
     virtual ~Audio_Stream();
     
     void open();
+    void open(HTTP_Stream_Position *position);
     void close();
     void pause();
     
@@ -58,11 +59,15 @@ public:
     unsigned durationInSeconds();
     void seekToTime(unsigned newSeekTime);
     
+    HTTP_Stream_Position streamPositionForTime(unsigned newSeekTime);
+    
     void setVolume(float volume);
     
     void setUrl(CFURLRef url);
     void setStrictContentTypeChecking(bool strictChecking);
     void setDefaultContentType(CFStringRef defaultContentType);
+    void setSeekPosition(unsigned seekPosition);
+    void setContentLength(size_t contentLength);
     
     void setOutputFile(CFURLRef url);
     CFURLRef outputFile();
@@ -93,7 +98,6 @@ private:
     
     bool m_httpStreamRunning;
     bool m_audioStreamParserRunning;
-    bool m_needNewQueue;
     
     size_t m_contentLength;
     
@@ -102,6 +106,7 @@ private:
     Audio_Queue *m_audioQueue;
     
     CFRunLoopTimerRef m_watchdogTimer;
+    CFRunLoopTimerRef m_playbackStopTimer;
     
     AudioFileStreamID m_audioFileStream;	// the audio file stream parser
     AudioConverterRef m_audioConverter;
@@ -113,7 +118,7 @@ private:
     UInt8 *m_outputBuffer;
     
     UInt64 m_dataOffset;
-    double m_seekTime;
+    unsigned m_seekPosition;
     size_t m_bounceCount;
     CFAbsoluteTime m_firstBufferingTime;
     
@@ -147,6 +152,7 @@ private:
     unsigned bitrate();
     
     static void watchdogTimerCallback(CFRunLoopTimerRef timer, void *info);
+    static void playbackStopTimerCallback(CFRunLoopTimerRef timer, void *info);
     
     static OSStatus encoderDataCallback(AudioConverterRef inAudioConverter, UInt32 *ioNumberDataPackets, AudioBufferList *ioData, AudioStreamPacketDescription **outDataPacketDescription, void *inUserData);
     static void propertyValueCallback(void *inClientData, AudioFileStreamID inAudioFileStream, AudioFileStreamPropertyID inPropertyID, UInt32 *ioFlags);

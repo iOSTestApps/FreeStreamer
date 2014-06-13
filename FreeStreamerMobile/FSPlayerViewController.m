@@ -134,7 +134,6 @@
     
 #if ENABLE_ANALYZER
     self.analyzer = [[FSFrequencyDomainAnalyzer alloc] init];
-    self.audioController.stream.delegate = self.analyzer;
     self.analyzer.delegate = self.frequencyPlotView;
 #endif
 }
@@ -156,8 +155,6 @@
 
 - (void)viewWillDisappear:(BOOL)animated
 {
-    [self.audioController stop];
-    
     [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
     
     [self resignFirstResponder];
@@ -168,6 +165,9 @@
 - (void)viewDidDisappear:(BOOL)animated
 {
     [super viewDidDisappear:animated];
+    
+    // Free the resources (audio queue, etc.)
+    _audioController = nil;
     
 #if ENABLE_ANALYZER
     self.analyzer.enabled = NO;
@@ -436,6 +436,18 @@
 - (FSPlaylistItem *)selectedPlaylistItem
 {
     return _selectedPlaylistItem;
+}
+
+- (FSAudioController *)audioController
+{
+    if (!_audioController) {
+        _audioController = [[FSAudioController alloc] init];
+        
+#if ENABLE_ANALYZER
+        _audioController.stream.delegate = self.analyzer;
+#endif
+    }
+    return _audioController;
 }
 
 /*
