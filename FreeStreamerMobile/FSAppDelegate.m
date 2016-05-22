@@ -6,11 +6,14 @@
 
 #import "FSAppDelegate.h"
 #import "FSAudioController.h"
+#import <BuddyBuildSDK/BuddyBuildSDK.h>
 
 @implementation FSAppDelegate
 
 - (BOOL)application:(UIApplication *)application didFinishLaunchingWithOptions:(NSDictionary *)launchOptions
 {
+    [BuddyBuildSDK setup];
+    
     [self.window setRootViewController:self.navigationController];
     [self.window makeKeyAndVisible];
     
